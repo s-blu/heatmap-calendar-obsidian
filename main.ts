@@ -108,6 +108,7 @@ export default class HeatmapCalendar extends Plugin {
 				date?: string;
 				content?: string;
 				classNames?: string,
+				startofMonth?: string
 			}
 
 			const boxes: Array<Box> = []
@@ -121,11 +122,13 @@ export default class HeatmapCalendar extends Plugin {
 			const todaysDayNumberLocal = this.getHowManyDaysIntoYearLocal(new Date())
 
 			for (let day = 1; day <= numberOfDaysInYear; day++) {
+				const boxDate = new Date(Date.UTC(year, 0, day))
 				const box: Box = {
-					tooltip: new Date(Date.UTC(year, 0, day)).toLocaleDateString(),
+					tooltip: boxDate.toLocaleDateString(),
 				}
 
 				if (day === todaysDayNumberLocal && showCurrentDayBorder) box.classNames = "today"
+				if (boxDate.getMonth() !== new Date(Date.UTC(year, 0, day - 1)).getMonth()) box.startofMonth = boxDate.toLocaleDateString(undefined, {month: "narrow",})
 
 				if (mappedEntries[day]) {
 					const entry = mappedEntries[day]
@@ -175,7 +178,7 @@ export default class HeatmapCalendar extends Plugin {
 			})
 
 			boxes.forEach(e => {
-				createEl("li", {
+				const box = createEl("li", {
 					text: e.content,
 					attr: {
 						...e.backgroundColor && { style: `background-color: ${e.backgroundColor};`, },
@@ -184,6 +187,8 @@ export default class HeatmapCalendar extends Plugin {
 					cls: e.classNames,
 					parent: heatmapCalendarBoxesUl,
 				})
+
+				if (e.startofMonth) box.setAttr('data-startofmonth', e.startofMonth)
 			})
 
 		}

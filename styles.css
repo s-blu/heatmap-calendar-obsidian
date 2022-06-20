@@ -60,3 +60,14 @@
       .heatmap-calendar-boxes .today {
         border: solid 1px rgb(61, 61, 61);
       }
+
+      .heatmap-calendar-boxes [data-startofmonth] {
+        position: relative;
+      }
+      
+      .heatmap-calendar-boxes [data-startofmonth]::before {
+        content: attr(data-startofmonth);
+        position: absolute;
+        left: 1px;
+        font-size: 5pt;
+      }
