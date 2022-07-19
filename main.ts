@@ -1,10 +1,5 @@
 import { Plugin, } from 'obsidian'
 
-// TODO: blande farga om man bruka to farga i en event?
-// TODO: custom fixed scale istedenfor automap
-// CouldDO: laga visuell scala under, me min max avg text
-// CouldDO: konne legge til so monge farga man vil i colors array 
-
 interface CalendarData {
 	year: number
 	colors: {
@@ -15,21 +10,25 @@ interface CalendarData {
 	entries: Entry[]
 	showCurrentDayBorder: boolean
 	defaultEntryIntensity: number
+	intensityScaleStart: number
+	intensityScaleEnd: number
 }
 interface Entry {
 	date: string
 	intensity?: number
-	color?: string | number
-	content?: string
+	color: string 
+	content: string
 }
 const DEFAULT_SETTINGS: CalendarData = {
-	year: new Date().getUTCFullYear(),
+	year: new Date().getFullYear(),
 	colors: {
 		default: ["#c6e48b", "#7bc96f", "#49af5d", "#2e8840", "#196127",],
 	},
-	entries: [{ date: "1900-01-01", },],
+	entries: [{ date: "1900-01-01", color: "#7bc96f", intensity: 5, content: "",},],
 	showCurrentDayBorder: true,
 	defaultEntryIntensity: 4,
+	intensityScaleStart: 1,
+	intensityScaleEnd: 5,
 }
 export default class HeatmapCalendar extends Plugin {
 
@@ -52,6 +51,14 @@ export default class HeatmapCalendar extends Plugin {
 				Date.UTC(date.getFullYear(), 0, 0)) / 24 / 60 / 60 / 1000
 		)
 	}
+	/** 
+	 * Removes HTMLElements passed as entry.content and outside of the displayed year from rendering above the calendar
+	 */
+	removeHtmlElementsNotInYear(entries: Entry[], year: number) {
+		const calEntriesNotInDisplayedYear = entries.filter(e => new Date(e.date).getFullYear() !== year) ?? this.settings.entries
+		//@ts-ignore
+		calEntriesNotInDisplayedYear.forEach(e => e.content instanceof HTMLElement && e.content.remove())
+	}
 
 	clamp(input: number, min: number, max: number): number {
 		return input < min ? min : input > max ? max : input
@@ -71,32 +78,34 @@ export default class HeatmapCalendar extends Plugin {
 
 			const year = calendarData.year ?? this.settings.year
 			const colors = calendarData.colors ?? this.settings.colors
-			const calEntries = calendarData.entries ?? this.settings.entries
+
+			this.removeHtmlElementsNotInYear(calendarData.entries, year)
+
+			const calEntries = calendarData.entries.filter(e => new Date(e.date).getFullYear() === year) ?? this.settings.entries
+
 			const showCurrentDayBorder = calendarData.showCurrentDayBorder ?? this.settings.showCurrentDayBorder
 
-			const intensities: Array<number> = []
+			const defaultEntryIntensity = calendarData.defaultEntryIntensity ?? this.settings.defaultEntryIntensity
+
+			const intensities = calEntries.filter(e => e.intensity).map(e => e.intensity as number)
+			const minimumIntensity = intensities.length ? Math.min(...intensities) : this.settings.intensityScaleStart
+			const maximumIntensity = intensities.length ? Math.max(...intensities) : this.settings.intensityScaleEnd
+			const intensityScaleStart = calendarData.intensityScaleStart ?? minimumIntensity
+			const intensityScaleEnd = calendarData.intensityScaleEnd ?? maximumIntensity
+
+			const mappedEntries: Entry[] = []
 			calEntries.forEach(e => {
-				if (e.intensity) intensities.push(e.intensity)
-			})
-
-			const minimumIntensity = Math.min(...intensities) ?? 1
-			const maximumIntensity = Math.max(...intensities) ?? 5
-
-			const mappedEntries: Array<Entry> = []
-
-			calEntries.forEach(e => {
-				if (new Date(e.date).getUTCFullYear() === year) {
-
-					const newEntry = { ...e, }
-					newEntry.intensity = e.intensity ?? this.settings.defaultEntryIntensity
-
-					if (minimumIntensity === maximumIntensity)
-						newEntry.intensity = 5
-					else
-						newEntry.intensity = Math.round(this.map(newEntry.intensity, minimumIntensity, maximumIntensity, 1, 5))
-
-					mappedEntries[this.getHowManyDaysIntoYear(new Date(e.date))] = newEntry
+				const newEntry = {
+					intensity: defaultEntryIntensity,
+					...e,
 				}
+				const colorIntensities = colors[e.color] ?? colors[Object.keys(colors)[0]]
+				const numOfColorIntensities = Object.keys(colorIntensities).length
+
+				if(minimumIntensity === maximumIntensity) newEntry.intensity = minimumIntensity
+				else newEntry.intensity = Math.round(this.map(newEntry.intensity, intensityScaleStart, intensityScaleEnd, 1, numOfColorIntensities))
+	
+				mappedEntries[this.getHowManyDaysIntoYear(new Date(e.date))] = newEntry
 			})
 
 			const firstDayOfYear = new Date(Date.UTC(year, 0, 1))
@@ -107,7 +116,7 @@ export default class HeatmapCalendar extends Plugin {
 				backgroundColor?: string;
 				date?: string;
 				content?: string;
-				classNames?: string,
+				classNames?: string[],
 				startofMonth?: string
 			}
 
@@ -127,10 +136,11 @@ export default class HeatmapCalendar extends Plugin {
 					tooltip: boxDate.toLocaleDateString(),
 				}
 
-				if (day === todaysDayNumberLocal && showCurrentDayBorder) box.classNames = "today"
+				if (day === todaysDayNumberLocal && showCurrentDayBorder) box.classNames?.push("today")
 				if (boxDate.getMonth() !== new Date(Date.UTC(year, 0, day - 1)).getMonth()) box.startofMonth = boxDate.toLocaleDateString(undefined, {month: "narrow",})
 
 				if (mappedEntries[day]) {
+					box.classNames?.push("hasData")
 					const entry = mappedEntries[day]
 
 					box.date = entry.date
@@ -138,9 +148,9 @@ export default class HeatmapCalendar extends Plugin {
 					if (entry.content) box.content = entry.content
 
 					const currentDayColors = entry.color ? colors[entry.color] : colors[Object.keys(colors)[0]]
-					box.backgroundColor = currentDayColors[entry.intensity - 1]
+					box.backgroundColor = currentDayColors[entry.intensity as number - 1]
 
-				}
+				} else box.classNames?.push("isEmpty")
 				boxes.push(box)
 			}
 
@@ -160,7 +170,7 @@ export default class HeatmapCalendar extends Plugin {
 				parent: heatmapCalendarGraphDiv,
 			})
 
-			const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+			const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",]
 			for (const m of months) createEl("li", { text: m, parent: heatmapCalendarMonthsUl, })
 
 			const heatmapCalendarDaysUl = createEl("ul", {
@@ -168,7 +178,7 @@ export default class HeatmapCalendar extends Plugin {
 				parent: heatmapCalendarGraphDiv,
 			})
 
-			const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+			const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun",]
 			for (const d of days) createEl("li", { text: d, parent: heatmapCalendarDaysUl, })
 			
 

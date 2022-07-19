@@ -1,8 +1,10 @@
 [
   "file-explorer",
   "global-search",
+  "page-preview",
   "daily-notes",
   "command-palette",
   "editor-status",
+  "starred",
   "workspaces"
 ]
