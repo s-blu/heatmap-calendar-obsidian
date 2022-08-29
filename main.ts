@@ -113,17 +113,17 @@ export default class HeatmapCalendar extends Plugin {
 
 			interface Box {
 				tooltip: string,
+				classNames: string[],
 				backgroundColor?: string;
 				date?: string;
 				content?: string;
-				classNames?: string[],
 				startofMonth?: string
 			}
 
 			const boxes: Array<Box> = []
 
 			while (numberOfEmptyDaysBeforeYearBegins) {
-				boxes.push({ backgroundColor: "transparent", tooltip: "", })
+				boxes.push({ backgroundColor: "transparent", tooltip: "", classNames: []})
 				numberOfEmptyDaysBeforeYearBegins--
 			}
 			const lastDayOfYear = new Date(Date.UTC(year, 11, 31))
@@ -134,13 +134,14 @@ export default class HeatmapCalendar extends Plugin {
 				const boxDate = new Date(Date.UTC(year, 0, day))
 				const box: Box = {
 					tooltip: boxDate.toLocaleDateString(),
+					classNames: [],
 				}
 
-				if (day === todaysDayNumberLocal && showCurrentDayBorder) box.classNames?.push("today")
+				if (day === todaysDayNumberLocal && showCurrentDayBorder) box.classNames.push("today")
 				if (boxDate.getMonth() !== new Date(Date.UTC(year, 0, day - 1)).getMonth()) box.startofMonth = boxDate.toLocaleDateString(undefined, {month: "narrow",})
 
 				if (mappedEntries[day]) {
-					box.classNames?.push("hasData")
+					box.classNames.push("hasData")
 					const entry = mappedEntries[day]
 
 					box.date = entry.date
@@ -150,7 +151,7 @@ export default class HeatmapCalendar extends Plugin {
 					const currentDayColors = entry.color ? colors[entry.color] : colors[Object.keys(colors)[0]]
 					box.backgroundColor = currentDayColors[entry.intensity as number - 1]
 
-				} else box.classNames?.push("isEmpty")
+				} else box.classNames.push("isEmpty")
 				boxes.push(box)
 			}
 
